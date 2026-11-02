@@ -1,0 +1,29 @@
+====================================================================
+MODE=honest   (Alice sends: "hello-bob-baseline")
+--- Mallory (malicious server) ---
+[mallory] malicious server up on 0.0.0.0:9000 (mode=honest)
+[mallory] mode=honest: FORWARDED e2e ciphertext alice->bob (plaintext is NOT recoverable by the server)
+--- Bob (victim) client log ---
+14:23:56 X3DH responder: session with alice (OPK id=0)
+[alice] hello-bob-baseline
+14:23:56 recv <- alice (dh=...70febe19, n=0, pn=0)
+====================================================================
+MODE=reencrypt   (Alice sends: "meet me at 5pm -alice")
+--- Mallory (malicious server) ---
+[mallory] SUBSTITUTED bundle for 'bob' -> handed Mallory's keys to the initiator
+[mallory] *** RECOVERED PLAINTEXT alice->bob: "meet me at 5pm -alice" ***
+[mallory] FORWARDED re-encrypted frame to real 'bob' (transparent; both sides see a working session)
+--- Bob (victim) client log ---
+14:24:04 X3DH responder: session with alice (OPK id=0)
+14:24:04 recv <- alice (dh=...5039323d, n=0, pn=0)
+[alice] meet me at 5pm -alice
+====================================================================
+MODE=raw   (Alice sends: "this will not arrive")
+--- Mallory (malicious server) ---
+[mallory] malicious server up on 0.0.0.0:9000 (mode=raw)
+[mallory] SUBSTITUTED bundle for 'bob' -> handed Mallory's keys to the initiator
+[mallory] *** RECOVERED PLAINTEXT alice->bob: "this will not arrive" ***
+[mallory] mode=raw: relayed Alice's ORIGINAL ciphertext to 'bob' -> his decrypt will FAIL (keys don't match)
+--- Bob (victim) client log ---
+14:24:11 X3DH responder: session with alice (OPK id=1)
+14:24:11 DECRYPT FAIL from alice (dh=...98f22e2d, n=0): AEAD authentication failed

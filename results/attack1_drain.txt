@@ -1,0 +1,15 @@
+=== Attack 1: Prekey Pogo (OPK exhaustion) ===
+--- Bob publishes his bundle (5 OPKs) ---
+14:23:48 published bundle + 5 OPKs (server reports 5 total)
+--- Mallory (ordinary client) drains Bob's OPK inventory via fetch_bundle ---
+[attack1] draining OPKs of 'bob' via fetch_bundle (unauthenticated, one reused connection)
+
+[attack1] summary: drained 5 OPK(s) from 'bob'; inventory EMPTY -> new sessions with 'bob' are now DENIED until it republishes.
+fetch #1: got OPK id=1, remaining count=4
+fetch #2: got OPK id=2, remaining count=3
+fetch #3: got OPK id=3, remaining count=2
+fetch #4: got OPK id=4, remaining count=1
+fetch #5: got OPK id=5, remaining count=-1
+fetch -> REFUSED: no one-time prekeys available for bob
+--- A legitimate NEW initiator (carol) can no longer start a session with bob ---
+> 14:23:51 fetch_bundle(bob): no one-time prekeys available for bob

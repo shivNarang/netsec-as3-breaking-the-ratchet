@@ -15,8 +15,13 @@ All attacks are plain C++17, no external dependencies.
 ```bash
 g++ -O2 -std=c++17 -o attack0 attack0.cpp -lpthread
 g++ -O2 -std=c++17 -o attack1 attack1.cpp -lpthread
-g++ -O2 -std=c++17 -o attack2 attack2.cpp -lpthread
+# attack2 uses OpenSSL (X25519 / HKDF / HMAC / ChaCha20-Poly1305):
+g++ -O2 -std=c++17 -o attack2 attack2.cpp -lpthread -lcrypto
 ```
+
+Attack 0 and Attack 1 have no external dependencies. Attack 2 links OpenSSL
+(`libssl-dev`); it is the only attack that needs it, because it reimplements the client
+crypto to decrypt/re-encrypt intercepted traffic.
 
 ---
 
@@ -83,13 +88,52 @@ Real data and figures are committed under `results/`.
 
 ## Attack 1 — one-time prekey exhaustion ("Prekey Pogo")  [owner: 23b1057]
 
-> Stub — assigned to teammate. A malicious client repeatedly `fetch_bundle`s Bob to
-> drain his OPK inventory, then shows that no new session can be started.
+A malicious ordinary client drains Bob's one-time-prekey inventory with unauthenticated,
+unrate-limited `fetch_bundle` requests (one OPK consumed per fetch), then shows that no
+new session can be started with Bob until he republishes.
+
+```bash
+docker run --rm --network as3net -v "$PWD/build:/b" debian:stable-slim \
+    /b/attack1 --server as3_server:9000 --target bob
+# measured: 5 OPKs drained in one burst -> fetch_bundle refused; a fresh client (Carol)
+# can no longer start a session with bob (results/attack1_drain.txt)
+```
 
 ## Attack 2 — malicious-server MITM / key substitution  [owner: 23b1057]
 
-> Stub — assigned to teammate. A malicious server component substitutes identity/prekey
-> material to run separate sessions with Alice and Bob.
+A **malicious server** (Mallory) exploits the unverified signed-prekey signature: when an
+initiator fetches a peer's bundle she substitutes her own identity/prekeys, establishes
+separate Double-Ratchet sessions with each side, decrypts every message, and re-encrypts
+it for the other party — a transparent MITM. Point **both** clients at Mallory
+(`--server-addr mallory --port 9000`). Three modes produce the three required evidence
+classes:
+
+```bash
+# transparent MITM: recover plaintext AND forward so both sides see a working session
+docker run -d --name mallory --network as3net -v "$PWD/build:/b" debian:stable-slim \
+    /b/attack2 --listen 0.0.0.0:9000 --mode reencrypt
+#   --mode honest : relay e2e ciphertext unchanged (server cannot read it) — the baseline
+#   --mode raw    : substitute+decrypt but relay Alice's original ct -> Bob's decrypt FAILS
+# evidence: results/attack2_evidence.txt
+```
+
+### Build (Linux container, for running on as3net)
+
+```bash
+docker run --rm -v "$PWD:/src" gcc:13 bash -c \
+    "g++ -O2 -std=c++17 -static -o /src/build/attack1 /src/attack1.cpp -lpthread"
+docker run --rm -v "$PWD:/src" gcc:13 bash -c \
+    "apt-get update -qq && apt-get install -y -qq libssl-dev && \
+     g++ -O2 -std=c++17 -static -o /src/build/attack2 /src/attack2.cpp -lssl -lcrypto -lpthread -ldl"
+```
+
+### Measurement + evidence
+
+```bash
+# from the submission root: builds both attacks and regenerates results/attack1_drain.txt
+# and results/attack2_evidence.txt from real lab runs
+bash scripts/run_attack12_experiments.sh
+```
 
 ---
 
